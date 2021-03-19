@@ -7,6 +7,9 @@ import pathlib
 LOGGER = logging.getLogger(__name__)
 
 
+DATA_FOLDER = pathlib.Path(__file__).parent.parent.joinpath('data')
+
+
 class NameList:
     names: List[str]
     weights: List[float]
@@ -27,11 +30,11 @@ class NameBase:
     names: Set[str]
     years: Dict[int, NameList]
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: Union[str, pathlib.Path]):
         self.names = set()
         self.years = {}
 
-        assert pathlib.Path(filename).is_file()
+        assert pathlib.Path(filename).is_file(), filename
 
         with open(filename, 'r') as f:
             LOGGER.debug(f"Opening database {filename}")
@@ -71,8 +74,10 @@ class NameGenerator:
     def __init__(self):
         LOGGER.debug("Init name databases")
         self.bases = {}
-        self.bases['boy'] = NameBase('./data/PersonerProsentGutter.csv')
-        self.bases['girl'] = NameBase('./data/PersonerProsentJenter.csv')
+        self.bases['boy'] = NameBase(
+            DATA_FOLDER.joinpath('PersonerProsentGutter.csv'))
+        self.bases['girl'] = NameBase(
+            DATA_FOLDER.joinpath('PersonerProsentJenter.csv'))
 
     def get_name(self, gender: Union[str, None], year: int, surname: bool = False) -> str:
         # If gender is not specified, pick one at random
