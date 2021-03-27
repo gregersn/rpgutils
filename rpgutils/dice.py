@@ -1,6 +1,14 @@
 import re
 import random
 from typing import Dict, List
+from dataclasses import dataclass
+
+
+@dataclass
+class Result:
+    total: int
+    rolls: List[int]
+    modifier: int
 
 
 class Die():
@@ -19,11 +27,11 @@ class Die():
             modifier = f'{"+" if self.modifier > 0 else "-"}{abs(self.modifier)}'
         return f'{self.count}D{self.sides}{modifier}'
 
-    def roll(self):
-        total = self.modifier
-        for i in range(self.count):
-            total += random.randint(1, self.sides)
-        return total
+    def roll(self) -> Result:
+        rolls = [random.randint(1, self.sides) for i in range(self.count)]
+        total = self.modifier + sum(rolls)
+
+        return Result(total, rolls, self.modifier)
 
 
 class Roll():
@@ -40,7 +48,7 @@ class Roll():
         return " ".join([self.dice(), "giving", str(self.roll())])
 
     def roll(self):
-        return sum(d.roll() for d in self._dice)
+        return sum(d.roll().total for d in self._dice)
 
     def advantage(self):
         self._advantage += 1
@@ -91,6 +99,7 @@ def main():
     print(roll())
     print(roll("d20"))
     print(roll("3d6"))
+    print(roll("1d6+3 1d20"))
     print(roll("+"))
     print(roll("-"))
     print(roll("d4+1"))
