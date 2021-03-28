@@ -13,10 +13,10 @@ class Result:
     def __str__(self):
         modifier = ''
         if self.modifier != 0:
-            modifier = f'{"+" if self.modifier > 0 else "-"}{abs(self.modifier)}'
+            modifier = f'{" + " if self.modifier > 0 else " - "}{abs(self.modifier)}'
 
         if len(self.rolls) > 1:
-            return f"[{' + '.join(str(r) for r in self.rolls)}]{modifier} = {self.total}"
+            return f"({' + '.join(str(r) for r in self.rolls)}){modifier} = {self.total}"
 
         if self.modifier != 0:
             return f"{self.rolls[0]}{modifier} = {self.total}"
@@ -25,32 +25,48 @@ class Result:
 
 
 class Die():
-    count: int
     sides: int
+
+    def __init__(self, sides: int):
+        self.sides = sides
+
+    def __str__(self):
+        return f"D{self.sides}"
+
+    def __int__(self):
+        return random.randint(1, self.sides)
+
+
+class Roll():
+    count: int
+    die: Die
     modifier: int
 
-    def __init__(self, sides: int, count: int = 1, modifier: int = 0):
+    def __init__(self, die: Die, count: int = 1,  modifier:  int = 0):
         self.count = count
-        self.sides = sides
+        self.die = die
         self.modifier = modifier
 
     def __str__(self):
         modifier = ''
         if self.modifier != 0:
             modifier = f'{"+" if self.modifier > 0 else "-"}{abs(self.modifier)}'
-        return f'{self.count}D{self.sides}{modifier}'
+        return f'{self.count}D{self.die.sides}{modifier}'
+
+    def __int__(self):
+        return sum([int(self.die) for _ in range(self.count)]) + self.modifier
 
     def roll(self) -> Result:
-        rolls = [random.randint(1, self.sides) for i in range(self.count)]
+        rolls = [random.randint(1, self.die.sides) for i in range(self.count)]
         total = self.modifier + sum(rolls)
 
         return Result(total, rolls, self.modifier)
 
 
-class Roll():
+class Roller():
     _advantage: int
     _disadvantage: int
-    _dice: List[Die]
+    _dice: List[Roll]
 
     def __init__(self):
         self._advantage = 0
@@ -63,7 +79,6 @@ class Roll():
     def roll(self):
         results = [str(d.roll()) for d in self._dice]
         return results
-        return sum(d.roll().total for d in self._dice)
 
     def advantage(self):
         self._advantage += 1
@@ -72,7 +87,7 @@ class Roll():
         self._disadvantage += 1
 
     def add_die(self, sides: int, amount: int = 1, modifier: int = 0):
-        self._dice.append(Die(sides, amount, modifier))
+        self._dice.append(Roll(Die(sides), amount, modifier))
 
     def dice(self) -> str:
         return ' '.join(str(die) for die in self._dice)
@@ -87,7 +102,7 @@ DICE_MATCH = r'(\d+)?[dD](\d+)([\+\-]\d+)?'
 def roll(commands: str = ""):
     tokens = commands.split(" ")
 
-    roll = Roll()
+    roll = Roller()
     for tok in tokens:
         if tok == '+':
             roll.advantage()
@@ -122,6 +137,7 @@ def main():
     print(roll("-"))
     print(roll("d4+1"))
     print(roll("100d4"))
+    print(roll("(2D6+6)*5"))
 
 
 if __name__ == '__main__':
