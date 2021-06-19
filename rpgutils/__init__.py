@@ -1,6 +1,6 @@
 from .names import NameGenerator
 from .names import NameBase
-from .dice import roll as diceroll
+from .dice.interpreter import roll as diceroll
 
 
 import click
@@ -24,9 +24,11 @@ def name(year: int, gender: str, count: int):
 
 
 @click.command()
-@click.argument('command', required=False, default='')
-def roll(command: str = ''):
-    print(diceroll(command))
+@click.argument('command', required=False, default='d100')
+@click.option('--average/--no-average', default=False, type=bool)
+def roll(command: str = 'd100', average: bool = False):
+    res, cmd = diceroll(command, average=average)
+    print(f"{cmd} = {res}")
 
 
 run.add_command(name)
