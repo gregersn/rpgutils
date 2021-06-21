@@ -1,0 +1,10 @@
+name: Gruff
+stats:
+  STR: (3d6+6)*5
+  CON: (2d6+6)*5
+  SIZ: (2d6+6)*5
+  DEX: (2d6+6)*5
+  INT: (2d6+6)*5
+  POW: (2d6+6)*5
+  HitPoints: (CON + SIZ) / 10
+  MagicPoints: POW / 5

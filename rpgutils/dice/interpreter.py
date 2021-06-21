@@ -1,5 +1,9 @@
 import random
-from typing import Union
+from typing import Union, List
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 INTEGER = 'INTEGER'
@@ -12,6 +16,8 @@ MINUS = 'MINUS'
 DIE = 'DIE'
 EOF = 'EOF'
 DICEROLL = 'DICEROLL'
+ID = 'ID'
+ASSIGN = 'ASSIGN'
 
 
 class AST:
@@ -56,6 +62,22 @@ class UnaryOp(AST):
         return f"<UnaryOp {self.op.value} {self.expr}>"
 
 
+class Var(AST):
+    def __init__(self, token):
+        self.token = token
+        self.value = token.value
+
+
+class Assign(AST):
+    def __init__(self, left, op, right):
+        self.left = left
+        self.token = self.op = op
+        self.right = right
+
+    def __repr__(self) -> str:
+        return f"<Assign {self.left} {self.right}>"
+
+
 class Token:
     def __init__(self, _type, value):
         self._type = _type
@@ -70,7 +92,7 @@ class Token:
 
 
 class Lexer:
-    def __init__(self, command):
+    def __init__(self, command: str):
         self.text = command
         self.pos = 0
         self.current_char = self.text[self.pos]
@@ -110,11 +132,22 @@ class Lexer:
         else:
             self.current_char = self.text[self.pos]
 
+    def _id(self):
+        result = ''
+        while self.current_char is not None and self.current_char.isalnum():
+            result += self.current_char
+            self.advance()
+        logging.warning(f"Found id: {result}")
+        return Token(ID, result)
+
     def get_next_token(self):
         while self.current_char is not None:
             if self.current_char.isspace():
                 self.skip_whitespace()
                 continue
+
+            if self.current_char.isalpha():
+                return self._id()
 
             if self.current_char == '*':
                 self.advance()
@@ -147,7 +180,11 @@ class Lexer:
                 self.advance()
                 return Token(MUL, '*')
 
-            raise Exception(f"Unexpexted char {self.current_char}")
+            if self.current_char == ':':
+                self.advance()
+                return Token(ASSIGN, ':')
+
+            raise Exception(f"Unexpected char {self.current_char}")
 
 
 class Parser:
@@ -188,7 +225,7 @@ class Parser:
         return node
 
     def factor(self):
-        # factor (PLUS|MINUS) factor | INTEGER | DICEROLL | LPAREN expr RPAREN
+        # factor (PLUS|MINUS) factor | INTEGER | DICEROLL | LPAREN expr RPAREN | variable
 
         token = self.current_token
 
@@ -211,6 +248,14 @@ class Parser:
             node = self.expr()
             self.eat(RPAREN)
             return node
+        else:
+            node = self.variable()
+            return node
+
+    def variable(self):
+        node = Var(self.current_token)
+        self.eat(ID)
+        return node
 
     def expr(self):
         # expr: term ((PLUS|MINUS) term)*
@@ -225,6 +270,20 @@ class Parser:
 
             node = BinOp(left=node, op=token, right=self.term())
         return node
+
+    def declarations(self):
+        # declaration: ID: expr
+        decls = []
+        while self.current_token is not None and self.current_token.type == ID:
+            id = self.current_token
+            self.eat(ID)
+            token = self.current_token
+            self.eat(ASSIGN)
+            expr = self.expr()
+
+            decls.append(Assign(id, token, expr))
+
+        return decls
 
     def parse(self):
         return self.expr()
@@ -243,12 +302,13 @@ class NodeVisitor:
 class Interpreter(NodeVisitor):
     parser: Parser
     average: bool
-    tree: Union[AST, None]
+    tree: Union[AST, List, None]
 
     def __init__(self, parser):
         self.parser = parser
         self.average = False
         self.tree = None
+        self.variables = {}
 
     def visit_BinOp(self, node):
         if node.op.type == PLUS:
@@ -256,6 +316,9 @@ class Interpreter(NodeVisitor):
 
         if node.op.type == MUL:
             return self.visit(node.left) * self.visit(node.right)
+
+        if node.op.type == DIV:
+            return self.visit(node.left) // self.visit(node.right)
 
         raise NotImplementedError(f"Unknown BinOp {node.op.type}")
 
@@ -277,11 +340,27 @@ class Interpreter(NodeVisitor):
             return -self.visit(node.expr)
         return self.visit(node.expr)
 
+    def visit_Var(self, node):
+        var_name = node.value
+        val = self.variables.get(var_name)
+        if val is None:
+            raise NameError(repr(var_name))
+        else:
+            return val
+
+    def visit_Assign(self, node: Assign):
+        var_name = node.left.value
+        self.variables[var_name] = self.visit(node.right)
+
     def interpret(self, average=False):
         self.average = average
         if self.tree is None:
-            self.tree = self.parser.parse()
-        return self.visit(self.tree)
+            self.tree = self.parser.declarations()
+        if isinstance(self.tree, list):
+            for v in self.tree:
+                self.visit(v)
+        else:
+            return self.visit(self.tree)
 
 
 class StringVisitor(NodeVisitor):
@@ -337,7 +416,11 @@ class StringVisitor(NodeVisitor):
         self.average = average
         if self.tree is None:
             self.tree = self.parser.parse()
-        return self.visit(self.tree)
+        if isinstance(self.tree, list):
+            for v in self.tree:
+                self.visit(v)
+        else:
+            return self.visit(self.tree)
 
 
 def roller(cmd: str):

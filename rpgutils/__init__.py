@@ -1,6 +1,7 @@
 from .names import NameGenerator
 from .names import NameBase
 from .dice.interpreter import roll as diceroll
+from rpgutils import character
 
 
 import click
@@ -31,5 +32,12 @@ def roll(command: str = 'd100', average: bool = False):
     print(f"{cmd} = {res}")
 
 
+@click.command()
+@click.argument('filename', required=True)
+def generate(filename: str):
+    print(character.generate(filename))
+
+
 run.add_command(name)
 run.add_command(roll)
+run.add_command(generate)
