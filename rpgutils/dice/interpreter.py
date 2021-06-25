@@ -18,6 +18,11 @@ EOF = 'EOF'
 DICEROLL = 'DICEROLL'
 ID = 'ID'
 ASSIGN = 'ASSIGN'
+LESSTHAN = 'LESSTHAN'
+GREATERTHAN = 'GREATERTHAN'
+QUESTIONMARK = 'QUESTIONMARK'
+COLON = 'COLON'
+NEWLINE = 'NEWLINE'
 
 
 class AST:
@@ -33,6 +38,13 @@ class BinOp(AST):
 
     def __repr__(self) -> str:
         return f"<BinOp {self.left} {self.op.value} {self.right}>"
+
+
+class TernaryOp(AST):
+    def __init__(self, condition, first, second):
+        self.condition = condition
+        self.first = first
+        self.second = second
 
 
 class Num(AST):
@@ -98,7 +110,7 @@ class Lexer:
         self.current_char = self.text[self.pos]
 
     def skip_whitespace(self):
-        while self.current_char is not None and self.current_char.isspace():
+        while self.current_char is not None and self.current_char.isspace() and self.current_char != '\n':
             self.advance()
 
     def number(self) -> Token:
@@ -142,9 +154,12 @@ class Lexer:
 
     def get_next_token(self):
         while self.current_char is not None:
-            if self.current_char.isspace():
+            if self.current_char.isspace() and self.current_char != '\n':
                 self.skip_whitespace()
                 continue
+
+            if self.current_char.lower() == 'd' and self.peek().isdigit():
+                return self.number()
 
             if self.current_char.isalpha():
                 return self._id()
@@ -153,7 +168,7 @@ class Lexer:
                 self.advance()
                 return Token(MUL, '*')
 
-            if self.current_char.isdigit() or self.current_char.lower() == 'd':
+            if self.current_char.isdigit():
                 return self.number()
 
             if self.current_char == '(':
@@ -180,9 +195,21 @@ class Lexer:
                 self.advance()
                 return Token(MUL, '*')
 
+            if self.current_char == '>':
+                self.advance()
+                return Token(GREATERTHAN, '>')
+
+            if self.current_char == '<':
+                self.advance()
+                return Token(LESSTHAN, '<')
+
             if self.current_char == ':':
                 self.advance()
                 return Token(ASSIGN, ':')
+
+            if self.current_char == '\n':
+                self.advance()
+                return Token(NEWLINE, '\n')
 
             raise Exception(f"Unexpected char {self.current_char}")
 
@@ -271,8 +298,25 @@ class Parser:
             node = BinOp(left=node, op=token, right=self.term())
         return node
 
+    def condition(self):
+
+    def conditional(self):
+        # conditional: condition QUESTIONMARK expr COLON expr
+        node = self.condition()
+
+        if self.current_token is not None and self.current_token == QUESTIONMARK:
+            self.eat(QUESTIONMARK)
+            first = self.expr()
+            self.eat(COLON)
+            second = self.expr()
+
+            ternary = TernaryOp(condition=node, first=first, second=second)
+            return ternary
+
+        return node
+
     def declarations(self):
-        # declaration: ID: expr
+        # declaration: ID: conditional|expr NEWLINE
         decls = []
         while self.current_token is not None and self.current_token.type == ID:
             id = self.current_token
@@ -280,6 +324,7 @@ class Parser:
             token = self.current_token
             self.eat(ASSIGN)
             expr = self.expr()
+            self.eat(NEWLINE)
 
             decls.append(Assign(id, token, expr))
 
