@@ -1,7 +1,7 @@
 from .names import NameGenerator
 from .names import NameBase
 from .dice.interpreter import roll as diceroll
-
+from .gui import showgui
 
 import click
 
@@ -31,5 +31,11 @@ def roll(command: str = 'd100', average: bool = False):
     print(f"{cmd} = {res}")
 
 
+@click.command()
+def gui():
+    showgui()
+
+
 run.add_command(name)
 run.add_command(roll)
+run.add_command(gui)
